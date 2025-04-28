@@ -48,7 +48,7 @@ public class ElaboratoGurobi {
 	 * Costante che indica il path del file .log
 	 * ATTENZIONE! Cambiare!
 	 */
-	private static final String LOG_PATH = "/Users/emanuel/Desktop";
+	private static final String LOG_PATH = "src/it/unibs/ro/elaborato/coppia22";
 
     static double[] pr = {
     		0.360,
@@ -234,7 +234,7 @@ public class ElaboratoGurobi {
 	        System.out.println(GRUPPO_COMPONENTI);
 	        
 	        /**
-	         * QUESITO 1
+	         * --------------------QUESITO 1--------------------
 	         */
 	        System.out.println(QUESITO_I);
 	        System.out.printf(FUNZIONE_OBIETTIVO, model.get(GRB.DoubleAttr.ObjVal));
@@ -273,7 +273,7 @@ public class ElaboratoGurobi {
 	        lambdaAZero(model);
 	        
 	        /**
-	         * QUESITO II
+	         * --------------------QUESITO II--------------------
 	         */
 	        System.out.println(QUESITO_II);
 	        
@@ -294,7 +294,7 @@ public class ElaboratoGurobi {
 	        System.out.printf(Q_MASSIMO,maxQforZMAX(model, rottami));
 	        
 	        /**
-	         * QUESITO III
+	         * --------------------QUESITO III--------------------
 	         */
 	        System.out.println(QUESITO_III);
 	        /**
@@ -311,12 +311,19 @@ public class ElaboratoGurobi {
 	        
 	        System.out.print(DIVIDER);
 	        
+	        /**
+	         * CHIUSURA MODELLI ED ENVIRONMENT
+	         */
 	        env.dispose();
 	        envIII.dispose();
 	        model.dispose();
 	        modelIII.dispose();
         }
 	}
+	
+	/**
+	 * ----------------------------------------METODI UTILIZZATI----------------------------------------
+	 */
 	
 	
 	/**
@@ -365,8 +372,6 @@ public class ElaboratoGurobi {
         
         return rottami;
 	}
-	
-	
 	/**
 	 * Metodo che crea l'espressione lineare del vincolo d'uguaglianza rappresentante la quantità 
 	 * in kg di acciaio da produrre e la inserisce nel modello
@@ -551,9 +556,14 @@ public class ElaboratoGurobi {
      * @throws GRBException
      */
 	public static void rangeObj(GRBModel model) throws GRBException {
-		
+		/*
+		 * Valore inferiore pari all'attributo SAObjLow se non tendente a -inf
+		 */
 		double lowerBound = model.getVarByName(VAR_ROTTAME + PEDICE_R).get(GRB.DoubleAttr.SAObjLow) <= -GRB.INFINITY? Double.NEGATIVE_INFINITY:
 			model.getVarByName(VAR_ROTTAME + PEDICE_R).get(GRB.DoubleAttr.SAObjLow);
+		/*
+		 * Valore superiore pari all'attributo SAObjUp se non tendente a +inf
+		 */
 		double upperBound = model.getVarByName(VAR_ROTTAME + PEDICE_R).get(GRB.DoubleAttr.SAObjUp) <= GRB.INFINITY? Double.POSITIVE_INFINITY:
 			model.getVarByName(VAR_ROTTAME + PEDICE_R).get(GRB.DoubleAttr.SAObjUp);
 		
@@ -577,8 +587,14 @@ public class ElaboratoGurobi {
 	 * @throws GRBException
 	 */
 	public  static void rangeConstr(GRBModel model, double maxProd) throws GRBException {
+		/*
+		 * Valore inferiore pari all'attributo SARHSLow se non tendente a -inf (diviso per maxProd perché parte del RHS dei vincoli)
+		 */
 		double lowerBound = model.getConstrByName(VINCOLO_MASSIMA_PERCENTUALE + PEDICE_E).get(GRB.DoubleAttr.SARHSLow) <= -GRB.INFINITY? Double.NEGATIVE_INFINITY:
 			model.getConstrByName(VINCOLO_MASSIMA_PERCENTUALE + PEDICE_E).get(GRB.DoubleAttr.SARHSLow) / maxProd;
+		/*
+		 * Valore superiore pari all'attributo SARHSUp se non tendente a -inf (diviso per maxProd perché parte del RHS dei vincoli)
+		 */
 		double upperBound = model.getConstrByName(VINCOLO_MASSIMA_PERCENTUALE + PEDICE_E).get(GRB.DoubleAttr.SARHSUp) >= GRB.INFINITY? Double.POSITIVE_INFINITY:
 			model.getConstrByName(VINCOLO_MASSIMA_PERCENTUALE + PEDICE_E).get(GRB.DoubleAttr.SARHSUp) / maxProd;
 		
@@ -600,17 +616,24 @@ public class ElaboratoGurobi {
 	 */
 	public static double maxQforZMAX(GRBModel model, GRBVar[] rottami) throws GRBException {
 		
-		double i = MAX_PRODUCTION;
+		double maxQ = MAX_PRODUCTION;
+		/*
+		 * Ciclo che elimina tutti i vincoli e li riaggiunge con un valore di Q maggiore
+		 */
 		do {
 			for(GRBConstr c: model.getConstrs()) {
 				model.remove(c);
 			}
-			i++;
-	        maxQuantityConstr(model, rottami, i);
-	        minMaxPercentage(model, rottami, i);
+			maxQ++;
+	        maxQuantityConstr(model, rottami, maxQ);
+	        minMaxPercentage(model, rottami, maxQ);
 			model.optimize();
 		} while(model.get(GRB.DoubleAttr.ObjVal) <= Z_MAX);
-		return --i;
+		/*
+		 * Per uscire dal ciclo ottengo un valore della funzione obiettivo più alto dello Z_MAX
+		 * quindi l'attuale valore di maxQ è più alto di un valore pari a 1. Diminuisco il valore e lo ritorno
+		 */
+		return --maxQ;
 	}
 	/**
 	 * Imposta l'obiettivo del modello delle due fasi come la somma di tutte le yi variabili ausiliarie
@@ -645,10 +668,13 @@ public class ElaboratoGurobi {
 	 * @return GRBVar[]
 	 */
 	public static GRBVar[] twoPhasesVariables(GRBModel model) throws GRBException {
-        GRBVar[] y = new GRBVar[NR_CONSTRAINTS];
+		/*
+		 * Tante variabili quanto i vincoli
+		 */
+		GRBVar[] y = new GRBVar[NR_CONSTRAINTS];
         
         for(int i = 0; i < NR_CONSTRAINTS; i++) {
-        	y[i] = model.addVar(0, 1, 0, GRB.BINARY, VAR_DUEFASI + (i + 1));
+        	y[i] = model.addVar(0, GRB.INFINITY, 0, GRB.CONTINUOUS, VAR_DUEFASI + (i + 1));
         }
         
         return y;
@@ -708,7 +734,9 @@ public class ElaboratoGurobi {
     		ct++;
     		lhs.clear();
         }
-        
+        /*
+         * Produzione totale
+         */
         GRBLinExpr lhsMaxQty = new GRBLinExpr();
         for(int i = 0; i < NR_ROTTAMI; i++) {
         	lhsMaxQty.addTerm(ur[i] * 0.01, rottami[i]);
@@ -754,9 +782,15 @@ public class ElaboratoGurobi {
 	 */
 	public static void twoPhasesVarValue(GRBModel model) throws GRBException {
         for(GRBVar v: model.getVars()) {
+        	/*
+        	 * Controllo, in modo da non stampare a video anche le yi (che sono a 0)
+        	 */
         	if(v.get(GRB.StringAttr.VarName).startsWith(VAR_ROTTAME))
         		System.out.printf(" %.4f ", v.get(GRB.DoubleAttr.X));
         }
+        /*
+         * Variabili slack
+         */
         for(GRBConstr c: model.getConstrs()) {
         	System.out.printf(" %.4f ", c.get(GRB.DoubleAttr.Slack));
         }
@@ -781,11 +815,14 @@ public class ElaboratoGurobi {
             }
         }
     }
-	
+	/**
+	 * Imposta i parametri dell'environment
+	 * @param env
+	 * @throws GRBException
+	 */
 	private static void impostaParametri(GRBEnv env) throws GRBException 
 	{
 		env.set(GRB.IntParam.OutputFlag, 0);
 		env.set(GRB.IntParam.Method, 0);
 		env.set(GRB.IntParam.Presolve, 0);
 	}
-}
